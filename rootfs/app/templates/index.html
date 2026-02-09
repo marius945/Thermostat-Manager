@@ -386,6 +386,10 @@
                 <button id="btn-restore" class="btn btn-warning hidden">Wiederherstellen</button>
                 <button id="btn-refresh" class="btn btn-secondary">Aktualisieren</button>
             </div>
+
+            <div class="sidebar-section" style="margin-top: auto;">
+                <button id="btn-debug" class="btn btn-secondary" style="font-size: 0.75em; opacity: 0.5;">Debug-Info</button>
+            </div>
         </aside>
 
         <!-- Main Content -->
@@ -608,6 +612,17 @@
         document.getElementById('btn-apply').addEventListener('click', applyOffset);
         document.getElementById('btn-restore').addEventListener('click', restore);
         document.getElementById('btn-refresh').addEventListener('click', refresh);
+
+        // Debug
+        document.getElementById('btn-debug').addEventListener('click', async () => {
+            try {
+                const res = await fetch('api/debug');
+                const data = await res.json();
+                alert(JSON.stringify(data, null, 2));
+            } catch (e) {
+                alert('Debug-Fehler: ' + e.message);
+            }
+        });
 
         // Initial load
         loadStatus().then(() => loadThermostats());
