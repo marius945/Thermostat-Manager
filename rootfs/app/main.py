@@ -13,7 +13,10 @@ logger = logging.getLogger(__name__)
 
 # Home Assistant Supervisor API
 SUPERVISOR_URL = "http://supervisor/core/api"
-SUPERVISOR_TOKEN = os.environ.get("SUPERVISOR_TOKEN", "")
+SUPERVISOR_TOKEN = os.environ.get("SUPERVISOR_TOKEN", "") or os.environ.get("HASSIO_TOKEN", "")
+
+logger.info(f"SUPERVISOR_TOKEN gesetzt: {bool(SUPERVISOR_TOKEN)}")
+logger.info(f"Verfügbare Token-Variablen: SUPERVISOR_TOKEN={'ja' if os.environ.get('SUPERVISOR_TOKEN') else 'nein'}, HASSIO_TOKEN={'ja' if os.environ.get('HASSIO_TOKEN') else 'nein'}")
 
 # Persistence file for original temperatures
 ORIGINALS_PATH = "/data/original_temps.json"
