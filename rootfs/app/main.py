@@ -157,9 +157,10 @@ def get_thermostats():
 
 @app.route("/api/apply_offset", methods=["POST"])
 def apply_offset():
-    """Apply a temperature offset to all thermostats."""
+    """Apply a temperature offset to selected thermostats."""
     data = request.json
     offset = float(data.get("offset", 0))
+    selected_ids = data.get("entity_ids", None)
 
     if offset == 0:
         return jsonify({"success": False, "error": "Offset darf nicht 0 sein"})
@@ -167,18 +168,28 @@ def apply_offset():
     entities = get_climate_entities()
     originals = load_originals()
 
-    # Only save originals on first application (protection against double offset)
+    # Filter to selected entities if provided
+    if selected_ids:
+        selected_set = set(selected_ids)
+        target_entities = [e for e in entities if e["entity_id"] in selected_set]
+    else:
+        target_entities = entities
+
+    if not target_entities:
+        return jsonify({"success": False, "error": "Keine Thermostate ausgewählt"})
+
+    # Save originals (merge with existing if already present)
     if originals is None:
         originals = {}
-        for entity in entities:
-            if entity["target_temperature"] is not None:
-                originals[entity["entity_id"]] = entity["target_temperature"]
-        save_originals(originals)
+    for entity in target_entities:
+        if entity["target_temperature"] is not None and entity["entity_id"] not in originals:
+            originals[entity["entity_id"]] = entity["target_temperature"]
+    save_originals(originals)
 
     errors = []
     applied = 0
 
-    for entity in entities:
+    for entity in target_entities:
         if entity["target_temperature"] is None:
             continue
 
@@ -207,25 +218,38 @@ def apply_offset():
 
 @app.route("/api/restore", methods=["POST"])
 def restore():
-    """Restore all thermostats to their original temperatures."""
+    """Restore selected or all thermostats to their original temperatures."""
+    data = request.json or {}
+    selected_ids = data.get("entity_ids", None)
     originals = load_originals()
 
     if originals is None:
         return jsonify({"success": False, "error": "Keine gespeicherten Originaltemperaturen vorhanden"})
 
+    # Determine which to restore
+    if selected_ids:
+        to_restore = {eid: temp for eid, temp in originals.items() if eid in selected_ids}
+    else:
+        to_restore = originals
+
     errors = []
     restored = 0
 
-    for entity_id, temperature in originals.items():
+    for entity_id, temperature in to_restore.items():
         success, error = set_temperature(entity_id, temperature)
         if success:
             restored += 1
         else:
             errors.append(error)
 
-    # Only delete file if all thermostats were restored successfully
+    # Remove restored entries from originals
     if not errors:
-        delete_originals()
+        for eid in to_restore:
+            originals.pop(eid, None)
+        if originals:
+            save_originals(originals)
+        else:
+            delete_originals()
         return jsonify({
             "success": True,
             "message": f"{restored} Thermostate auf Originaltemperaturen zurückgesetzt",

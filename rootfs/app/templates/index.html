@@ -359,6 +359,27 @@
             }
         }
 
+        /* Checkboxes */
+        .checkbox-cell {
+            width: 40px;
+            text-align: center;
+        }
+
+        input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--ha-primary);
+            cursor: pointer;
+            padding: 0;
+            border-radius: 4px;
+        }
+
+        .select-info {
+            font-size: 0.8em;
+            color: var(--ha-text-secondary);
+            margin-top: 4px;
+        }
+
         .hidden { display: none !important; }
     </style>
 </head>
@@ -415,10 +436,12 @@
                     <span id="thermostat-count" style="color: var(--ha-text-secondary); font-size: 0.85em;"></span>
                 </div>
                 <div class="card-content">
+                    <div id="select-info" class="select-info hidden">0 ausgewählt - Offset wird auf alle angewendet</div>
                     <div class="table-container">
                         <table id="thermostat-table">
                             <thead>
                                 <tr>
+                                    <th class="checkbox-cell"><input type="checkbox" id="select-all" title="Alle auswählen"></th>
                                     <th>Name</th>
                                     <th>Ist-Temperatur</th>
                                     <th>Soll-Temperatur</th>
@@ -427,7 +450,7 @@
                                 </tr>
                             </thead>
                             <tbody id="thermostat-body">
-                                <tr><td colspan="5" style="text-align:center; color: var(--ha-text-secondary);">Lade Thermostate...</td></tr>
+                                <tr><td colspan="6" style="text-align:center; color: var(--ha-text-secondary);">Lade Thermostate...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -441,6 +464,28 @@
     <script>
         let offsetActive = false;
         let refreshInterval = null;
+        let thermostatData = [];
+
+        function getSelectedIds() {
+            const checkboxes = document.querySelectorAll('.thermostat-checkbox:checked');
+            return Array.from(checkboxes).map(cb => cb.value);
+        }
+
+        function updateSelectInfo() {
+            const selected = getSelectedIds();
+            const info = document.getElementById('select-info');
+            const total = document.querySelectorAll('.thermostat-checkbox').length;
+            if (total === 0) {
+                info.classList.add('hidden');
+                return;
+            }
+            info.classList.remove('hidden');
+            if (selected.length === 0) {
+                info.textContent = 'Keine ausgewählt - Offset wird auf alle angewendet';
+            } else {
+                info.textContent = `${selected.length} von ${total} ausgewählt`;
+            }
+        }
 
         function showToast(message, type = 'info') {
             const toast = document.getElementById('toast');
@@ -516,20 +561,28 @@
                 const count = document.getElementById('thermostat-count');
                 tbody.innerHTML = '';
 
+                thermostatData = data.thermostats;
+
                 if (data.thermostats.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--ha-text-secondary);">Keine Thermostate gefunden</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color: var(--ha-text-secondary);">Keine Thermostate gefunden</td></tr>';
                     count.textContent = '0 Thermostate';
+                    updateSelectInfo();
                     return;
                 }
 
                 count.textContent = `${data.thermostats.length} Thermostate`;
 
+                // Remember previously selected
+                const prevSelected = getSelectedIds();
+
                 data.thermostats.forEach(t => {
                     const tr = document.createElement('tr');
+                    const checked = prevSelected.includes(t.entity_id) ? 'checked' : '';
                     const originalCell = offsetActive
                         ? `<td class="temp-value temp-original">${formatTemp(t.original_temperature)}</td>`
                         : '';
                     tr.innerHTML = `
+                        <td class="checkbox-cell"><input type="checkbox" class="thermostat-checkbox" value="${t.entity_id}" ${checked}></td>
                         <td>${t.name}</td>
                         <td class="temp-value temp-current">${formatTemp(t.current_temperature)}</td>
                         <td class="temp-value temp-target">${formatTemp(t.target_temperature)}</td>
@@ -538,6 +591,12 @@
                     `;
                     tbody.appendChild(tr);
                 });
+
+                // Checkbox event listeners
+                document.querySelectorAll('.thermostat-checkbox').forEach(cb => {
+                    cb.addEventListener('change', updateSelectInfo);
+                });
+                updateSelectInfo();
             } catch (e) {
                 showToast('Verbindungsfehler', 'error');
             }
@@ -555,10 +614,14 @@
             showToast('Wende Offset an...', 'info');
 
             try {
+                const selected = getSelectedIds();
+                const body = { offset };
+                if (selected.length > 0) body.entity_ids = selected;
+
                 const res = await fetch('api/apply_offset', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ offset }),
+                    body: JSON.stringify(body),
                 });
                 const data = await res.json();
 
@@ -582,9 +645,14 @@
             showToast('Stelle Originaltemperaturen wieder her...', 'info');
 
             try {
+                const selected = getSelectedIds();
+                const body = {};
+                if (selected.length > 0) body.entity_ids = selected;
+
                 const res = await fetch('api/restore', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
                 });
                 const data = await res.json();
 
@@ -612,6 +680,14 @@
         document.getElementById('btn-apply').addEventListener('click', applyOffset);
         document.getElementById('btn-restore').addEventListener('click', restore);
         document.getElementById('btn-refresh').addEventListener('click', refresh);
+
+        // Select all checkbox
+        document.getElementById('select-all').addEventListener('change', (e) => {
+            document.querySelectorAll('.thermostat-checkbox').forEach(cb => {
+                cb.checked = e.target.checked;
+            });
+            updateSelectInfo();
+        });
 
         // Debug
         document.getElementById('btn-debug').addEventListener('click', async () => {
