@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thermostat Manager</title>
+    <style>
+        :root {
+            --ha-primary: #03a9f4;
+            --ha-primary-dark: #0288d1;
+            --ha-accent: #ff9800;
+            --ha-success: #4caf50;
+            --ha-error: #f44336;
+            --ha-bg: #111111;
+            --ha-card: #1c1c1c;
+            --ha-card-border: #333;
+            --ha-text: #e1e1e1;
+            --ha-text-secondary: #9e9e9e;
+            --ha-input-bg: #2a2a2a;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: Roboto, 'Segoe UI', sans-serif;
+            background: var(--ha-bg);
+            color: var(--ha-text);
+            min-height: 100vh;
+        }
+
+        .app {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 280px;
+            background: var(--ha-card);
+            border-right: 1px solid var(--ha-card-border);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--ha-card-border);
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, var(--ha-primary), var(--ha-primary-dark));
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logo-icon svg {
+            width: 24px;
+            height: 24px;
+            fill: white;
+        }
+
+        .logo-text {
+            font-size: 1.2em;
+            font-weight: 500;
+        }
+
+        .sidebar-section {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .sidebar-section h3 {
+            font-size: 0.75em;
+            text-transform: uppercase;
+            color: var(--ha-text-secondary);
+            letter-spacing: 1px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .form-group label {
+            font-size: 0.85em;
+            color: var(--ha-text-secondary);
+        }
+
+        input, select {
+            background: var(--ha-input-bg);
+            border: 1px solid var(--ha-card-border);
+            border-radius: 8px;
+            padding: 10px 12px;
+            color: var(--ha-text);
+            font-size: 0.95em;
+            transition: border-color 0.2s;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--ha-primary);
+        }
+
+        /* Main Content */
+        .main {
+            flex: 1;
+            margin-left: 280px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .card {
+            background: var(--ha-card);
+            border-radius: 12px;
+            border: 1px solid var(--ha-card-border);
+            overflow: hidden;
+        }
+
+        .card-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--ha-card-border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .card-header h2 {
+            font-size: 1em;
+            font-weight: 500;
+        }
+
+        .card-content {
+            padding: 20px;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9em;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+            justify-content: center;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background: var(--ha-primary);
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: var(--ha-primary-dark);
+        }
+
+        .btn-warning {
+            background: var(--ha-accent);
+            color: white;
+        }
+
+        .btn-warning:hover:not(:disabled) {
+            background: #e68a00;
+        }
+
+        .btn-secondary {
+            background: var(--ha-input-bg);
+            color: var(--ha-text);
+            border: 1px solid var(--ha-card-border);
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: var(--ha-card-border);
+        }
+
+        /* Status Card */
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--ha-text-secondary);
+        }
+
+        .status-dot.active {
+            background: var(--ha-accent);
+            box-shadow: 0 0 8px rgba(255, 152, 0, 0.5);
+        }
+
+        .status-dot.inactive {
+            background: var(--ha-success);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.75em;
+            font-weight: 600;
+        }
+
+        .badge-active {
+            background: rgba(255, 152, 0, 0.2);
+            color: var(--ha-accent);
+        }
+
+        .badge-inactive {
+            background: rgba(76, 175, 80, 0.2);
+            color: var(--ha-success);
+        }
+
+        /* Table */
+        .table-container {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--ha-card-border);
+        }
+
+        th {
+            font-size: 0.75em;
+            text-transform: uppercase;
+            color: var(--ha-text-secondary);
+            font-weight: 600;
+        }
+
+        tr:hover {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .temp-value {
+            font-weight: 500;
+            font-size: 1.1em;
+        }
+
+        .temp-current {
+            color: var(--ha-primary);
+        }
+
+        .temp-target {
+            color: var(--ha-accent);
+        }
+
+        .temp-original {
+            color: var(--ha-text-secondary);
+        }
+
+        .mode-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: 500;
+        }
+
+        .mode-heat {
+            background: rgba(255, 152, 0, 0.15);
+            color: var(--ha-accent);
+        }
+
+        .mode-off {
+            background: rgba(158, 158, 158, 0.15);
+            color: var(--ha-text-secondary);
+        }
+
+        .mode-auto {
+            background: rgba(76, 175, 80, 0.15);
+            color: var(--ha-success);
+        }
+
+        .mode-cool {
+            background: rgba(3, 169, 244, 0.15);
+            color: var(--ha-primary);
+        }
+
+        /* Toast Notifications */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            padding: 14px 20px;
+            border-radius: 8px;
+            color: white;
+            font-size: 0.9em;
+            z-index: 1000;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s;
+        }
+
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .toast.info { background: var(--ha-primary); }
+        .toast.success { background: var(--ha-success); }
+        .toast.error { background: var(--ha-error); }
+        .toast.warning { background: var(--ha-accent); }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                position: relative;
+                width: 100%;
+                height: auto;
+                border-right: none;
+                border-bottom: 1px solid var(--ha-card-border);
+            }
+
+            .main {
+                margin-left: 0;
+            }
+
+            .app {
+                flex-direction: column;
+            }
+        }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24"><path d="M17,3H21V5H17V3M17,7H21V9H17V7M17,11H21V13H17.75L17,12.1V11M21,15V17H19C19,16.31 18.9,15.63 18.71,15H21M7,3V5H3V3H7M7,7V9H3V7H7M7,11V12.1L6.25,13H3V11H7M3,15H5.29C5.1,15.63 5,16.31 5,17H3V15M15,13L12,9L9,13H11V17C11,18.66 9.66,20 8,20H16C14.34,20 13,18.66 13,17V13H15Z"/></svg>
+                </div>
+                <span class="logo-text">Thermostat Manager</span>
+            </div>
+
+            <div class="sidebar-section">
+                <h3>Temperatur-Offset</h3>
+                <div class="form-group">
+                    <label>Offset (°C)</label>
+                    <input type="number" id="offset" value="2" step="0.5" min="-10" max="10">
+                </div>
+            </div>
+
+            <div class="sidebar-section" style="gap: 10px;">
+                <button id="btn-apply" class="btn btn-primary">Offset anwenden</button>
+                <button id="btn-restore" class="btn btn-warning hidden">Wiederherstellen</button>
+                <button id="btn-refresh" class="btn btn-secondary">Aktualisieren</button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main">
+            <!-- Status Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h2>Status</h2>
+                    <span id="status-badge" class="badge badge-inactive">Keine Änderungen</span>
+                </div>
+                <div class="card-content">
+                    <div class="status-indicator">
+                        <div id="status-dot" class="status-dot inactive"></div>
+                        <span id="status-text">Alle Thermostate auf Originaltemperaturen</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Thermostat Table -->
+            <div class="card">
+                <div class="card-header">
+                    <h2>Thermostate</h2>
+                    <span id="thermostat-count" style="color: var(--ha-text-secondary); font-size: 0.85em;"></span>
+                </div>
+                <div class="card-content">
+                    <div class="table-container">
+                        <table id="thermostat-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Ist-Temperatur</th>
+                                    <th>Soll-Temperatur</th>
+                                    <th id="col-original" class="hidden">Original</th>
+                                    <th>Modus</th>
+                                </tr>
+                            </thead>
+                            <tbody id="thermostat-body">
+                                <tr><td colspan="5" style="text-align:center; color: var(--ha-text-secondary);">Lade Thermostate...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script>
+        let offsetActive = false;
+        let refreshInterval = null;
+
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast ${type} show`;
+            setTimeout(() => toast.classList.remove('show'), 4000);
+        }
+
+        function getModeClass(mode) {
+            switch (mode) {
+                case 'heat': return 'mode-heat';
+                case 'off': return 'mode-off';
+                case 'auto': return 'mode-auto';
+                case 'cool': return 'mode-cool';
+                default: return 'mode-off';
+            }
+        }
+
+        function formatTemp(temp) {
+            if (temp === null || temp === undefined) return '-';
+            return temp.toFixed(1) + ' °C';
+        }
+
+        async function loadStatus() {
+            try {
+                const res = await fetch('api/status');
+                const data = await res.json();
+
+                if (data.success) {
+                    offsetActive = data.offset_active;
+                    updateStatusUI();
+                }
+            } catch (e) {
+                console.error('Status-Fehler:', e);
+            }
+        }
+
+        function updateStatusUI() {
+            const badge = document.getElementById('status-badge');
+            const dot = document.getElementById('status-dot');
+            const text = document.getElementById('status-text');
+            const restoreBtn = document.getElementById('btn-restore');
+            const colOriginal = document.getElementById('col-original');
+
+            if (offsetActive) {
+                badge.className = 'badge badge-active';
+                badge.textContent = 'Offset aktiv';
+                dot.className = 'status-dot active';
+                text.textContent = 'Temperatur-Offset ist aktiv - Originaltemperaturen gespeichert';
+                restoreBtn.classList.remove('hidden');
+                colOriginal.classList.remove('hidden');
+            } else {
+                badge.className = 'badge badge-inactive';
+                badge.textContent = 'Keine Änderungen';
+                dot.className = 'status-dot inactive';
+                text.textContent = 'Alle Thermostate auf Originaltemperaturen';
+                restoreBtn.classList.add('hidden');
+                colOriginal.classList.add('hidden');
+            }
+        }
+
+        async function loadThermostats() {
+            try {
+                const res = await fetch('api/thermostats');
+                const data = await res.json();
+
+                if (!data.success) {
+                    showToast(data.error || 'Fehler beim Laden', 'error');
+                    return;
+                }
+
+                const tbody = document.getElementById('thermostat-body');
+                const count = document.getElementById('thermostat-count');
+                tbody.innerHTML = '';
+
+                if (data.thermostats.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--ha-text-secondary);">Keine Thermostate gefunden</td></tr>';
+                    count.textContent = '0 Thermostate';
+                    return;
+                }
+
+                count.textContent = `${data.thermostats.length} Thermostate`;
+
+                data.thermostats.forEach(t => {
+                    const tr = document.createElement('tr');
+                    const originalCell = offsetActive
+                        ? `<td class="temp-value temp-original">${formatTemp(t.original_temperature)}</td>`
+                        : '';
+                    tr.innerHTML = `
+                        <td>${t.name}</td>
+                        <td class="temp-value temp-current">${formatTemp(t.current_temperature)}</td>
+                        <td class="temp-value temp-target">${formatTemp(t.target_temperature)}</td>
+                        ${originalCell}
+                        <td><span class="mode-badge ${getModeClass(t.hvac_mode)}">${t.hvac_mode}</span></td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (e) {
+                showToast('Verbindungsfehler', 'error');
+            }
+        }
+
+        async function applyOffset() {
+            const offset = parseFloat(document.getElementById('offset').value);
+            if (isNaN(offset) || offset === 0) {
+                showToast('Bitte einen gültigen Offset eingeben (nicht 0)', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('btn-apply');
+            btn.disabled = true;
+            showToast('Wende Offset an...', 'info');
+
+            try {
+                const res = await fetch('api/apply_offset', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ offset }),
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    showToast(data.message, 'success');
+                    await loadStatus();
+                    await loadThermostats();
+                } else {
+                    showToast(data.error, 'error');
+                }
+            } catch (e) {
+                showToast('Verbindungsfehler', 'error');
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        async function restore() {
+            const btn = document.getElementById('btn-restore');
+            btn.disabled = true;
+            showToast('Stelle Originaltemperaturen wieder her...', 'info');
+
+            try {
+                const res = await fetch('api/restore', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    showToast(data.message, 'success');
+                    await loadStatus();
+                    await loadThermostats();
+                } else {
+                    showToast(data.error, 'error');
+                }
+            } catch (e) {
+                showToast('Verbindungsfehler', 'error');
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        async function refresh() {
+            await loadStatus();
+            await loadThermostats();
+            showToast('Aktualisiert', 'info');
+        }
+
+        // Event Listeners
+        document.getElementById('btn-apply').addEventListener('click', applyOffset);
+        document.getElementById('btn-restore').addEventListener('click', restore);
+        document.getElementById('btn-refresh').addEventListener('click', refresh);
+
+        // Initial load
+        loadStatus().then(() => loadThermostats());
+
+        // Auto-refresh every 30 seconds
+        refreshInterval = setInterval(async () => {
+            await loadStatus();
+            await loadThermostats();
+        }, 30000);
+    </script>
+</body>
+</html>
