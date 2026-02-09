@@ -13,10 +13,36 @@ logger = logging.getLogger(__name__)
 
 # Home Assistant Supervisor API
 SUPERVISOR_URL = "http://supervisor/core/api"
-SUPERVISOR_TOKEN = os.environ.get("SUPERVISOR_TOKEN", "") or os.environ.get("HASSIO_TOKEN", "")
 
-logger.info(f"SUPERVISOR_TOKEN gesetzt: {bool(SUPERVISOR_TOKEN)}")
-logger.info(f"Verfügbare Token-Variablen: SUPERVISOR_TOKEN={'ja' if os.environ.get('SUPERVISOR_TOKEN') else 'nein'}, HASSIO_TOKEN={'ja' if os.environ.get('HASSIO_TOKEN') else 'nein'}")
+
+def find_supervisor_token():
+    """Find the Supervisor token from environment or file system."""
+    # 1. Environment variables
+    token = os.environ.get("SUPERVISOR_TOKEN", "") or os.environ.get("HASSIO_TOKEN", "")
+    if token:
+        logger.info("Token aus Umgebungsvariable geladen")
+        return token
+
+    # 2. S6 overlay container environment
+    token_paths = [
+        "/run/s6/container_environment/SUPERVISOR_TOKEN",
+        "/run/s6/container_environment/HASSIO_TOKEN",
+        "/config/token",
+        "/data/token",
+    ]
+    for path in token_paths:
+        if os.path.isfile(path):
+            with open(path, "r") as f:
+                token = f.read().strip()
+            if token:
+                logger.info(f"Token aus {path} geladen")
+                return token
+
+    logger.warning("Kein Supervisor-Token gefunden!")
+    return ""
+
+
+SUPERVISOR_TOKEN = find_supervisor_token()
 
 # Persistence file for original temperatures
 ORIGINALS_PATH = "/data/original_temps.json"
@@ -229,11 +255,30 @@ def debug():
     # Show ALL environment variable names
     all_env_names = sorted(os.environ.keys())
 
+    # Check known file paths
+    check_paths = [
+        "/run/s6/container_environment/",
+        "/run/s6/",
+        "/run/",
+        "/config/",
+        "/data/",
+    ]
+    found_paths = {}
+    for p in check_paths:
+        if os.path.isdir(p):
+            try:
+                found_paths[p] = os.listdir(p)
+            except Exception:
+                found_paths[p] = "Permission denied"
+        else:
+            found_paths[p] = "Not found"
+
     info = {
         "supervisor_token_set": bool(SUPERVISOR_TOKEN),
         "supervisor_token_length": len(SUPERVISOR_TOKEN),
         "supervisor_url": SUPERVISOR_URL,
         "all_env_var_names": all_env_names,
+        "filesystem_check": found_paths,
     }
     try:
         resp = requests.get(

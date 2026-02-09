@@ -1,6 +1,6 @@
 name: "Thermostat Manager"
 description: "Zentrale Steuerung von Homematic IP Thermostaten mit globalem Temperatur-Offset"
-version: "1.0.5"
+version: "1.0.6"
 slug: "thermostat_manager"
 init: false
 arch:
