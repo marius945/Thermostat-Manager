@@ -220,5 +220,33 @@ def status():
     })
 
 
+@app.route("/api/debug")
+def debug():
+    """Debug endpoint to check HA API connectivity."""
+    info = {
+        "supervisor_token_set": bool(SUPERVISOR_TOKEN),
+        "supervisor_url": SUPERVISOR_URL,
+    }
+    try:
+        resp = requests.get(
+            f"{SUPERVISOR_URL}/states",
+            headers=ha_headers(),
+            timeout=10,
+        )
+        info["status_code"] = resp.status_code
+        info["response_length"] = len(resp.text)
+        if resp.status_code == 200:
+            states = resp.json()
+            info["total_entities"] = len(states)
+            info["climate_entities"] = [
+                e["entity_id"] for e in states if e["entity_id"].startswith("climate.")
+            ]
+        else:
+            info["response_body"] = resp.text[:500]
+    except Exception as e:
+        info["error"] = str(e)
+    return jsonify(info)
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=False)
