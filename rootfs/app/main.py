@@ -226,9 +226,17 @@ def status():
 @app.route("/api/debug")
 def debug():
     """Debug endpoint to check HA API connectivity."""
+    # Show all environment variables containing TOKEN, HASSIO, SUPERVISOR
+    env_vars = {}
+    for key, value in os.environ.items():
+        if any(k in key.upper() for k in ["TOKEN", "HASSIO", "SUPERVISOR", "HOME_ASSISTANT"]):
+            env_vars[key] = value[:20] + "..." if len(value) > 20 else value
+
     info = {
         "supervisor_token_set": bool(SUPERVISOR_TOKEN),
+        "supervisor_token_length": len(SUPERVISOR_TOKEN),
         "supervisor_url": SUPERVISOR_URL,
+        "relevant_env_vars": env_vars,
     }
     try:
         resp = requests.get(
