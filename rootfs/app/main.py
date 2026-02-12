@@ -216,6 +216,60 @@ def apply_offset():
     })
 
 
+@app.route("/api/set_temperature", methods=["POST"])
+def set_absolute_temperature():
+    """Set an absolute temperature on selected thermostats."""
+    data = request.json
+    temperature = data.get("temperature")
+    selected_ids = data.get("entity_ids", None)
+
+    if temperature is None:
+        return jsonify({"success": False, "error": "Keine Temperatur angegeben"})
+
+    temperature = float(temperature)
+    entities = get_climate_entities()
+
+    # Filter to selected entities if provided
+    if selected_ids:
+        selected_set = set(selected_ids)
+        target_entities = [e for e in entities if e["entity_id"] in selected_set]
+    else:
+        target_entities = entities
+
+    if not target_entities:
+        return jsonify({"success": False, "error": "Keine Thermostate ausgewählt"})
+
+    # Save originals before changing (merge with existing)
+    originals = load_originals() or {}
+    for entity in target_entities:
+        if entity["target_temperature"] is not None and entity["entity_id"] not in originals:
+            originals[entity["entity_id"]] = entity["target_temperature"]
+    save_originals(originals)
+
+    errors = []
+    applied = 0
+
+    for entity in target_entities:
+        new_temp = max(entity["min_temp"], min(entity["max_temp"], temperature))
+        success, error = set_temperature(entity["entity_id"], new_temp)
+        if success:
+            applied += 1
+        else:
+            errors.append(error)
+
+    if errors:
+        return jsonify({
+            "success": True,
+            "message": f"{applied} Thermostate auf {temperature:.1f}°C gesetzt, {len(errors)} Fehler",
+            "errors": errors,
+        })
+
+    return jsonify({
+        "success": True,
+        "message": f"{applied} Thermostate auf {temperature:.1f}°C gesetzt",
+    })
+
+
 @app.route("/api/restore", methods=["POST"])
 def restore():
     """Restore selected or all thermostats to their original temperatures."""
